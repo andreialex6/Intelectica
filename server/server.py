@@ -1,5 +1,7 @@
-from flask import Flask, app, request, jsonify
+from flask import Flask, request, jsonify
 import pyodbc
+
+app = Flask(__name__)
 
 # ADO.NET converted for pyodbc
 connection_string = (
@@ -29,7 +31,7 @@ def login():
     conn.close()
 
     if row:
-        return jsonify({"status": "success", "message": "Login successful", "username": row.Username, "permissions": row.Permissions_Tier})
+        return jsonify({"status": "success", "message": "Login successful", "username": row.Username, "permissions": row.Permissions_Tier}), 200
     else:
         return jsonify({"status": "error", "message": "Invalid credentials"}), 401
 
@@ -43,9 +45,9 @@ def register():
     role = data.get("role")
 
     if not all([username, email, password, confirm, role]):
-        return "Missing fields", 400
+        return jsonify({"status": "error", "message": "Missing fields"}), 400
     if password != confirm:
-        return "Passwords do not match", 400
+        return jsonify({"status": "error", "message": "Passwords do not match"}), 400
 
     try:
         conn = pyodbc.connect(connection_string)
@@ -53,12 +55,13 @@ def register():
 
         cursor.execute("SELECT COUNT(*) FROM Users WHERE Username = ?", username)
         if cursor.fetchone()[0] > 0:
-            return "Username already exists", 400
+            return jsonify({"status": "error", "message": "Username already exists"}), 400
 
         cursor.execute("""
             INSERT INTO Users (Username, Email, Password, Permissions_Tier)
             VALUES (?, ?, ?, ?)
         """, username, email, password, 1)
+
         cursor.execute("SELECT SCOPE_IDENTITY()")
         user_id = int(cursor.fetchone()[0])
 
@@ -69,13 +72,13 @@ def register():
         elif role == "parinte":
             cursor.execute("INSERT INTO Parinti (Id, Username, Nume, Prenume, CopilId) VALUES (?, ?, '', '', NULL)", user_id, username)
         else:
-            return "Invalid role", 400
+            return jsonify({"status": "error", "message": "Invalid role"}), 400
 
         conn.commit()
-        return "Account created successfully", 200
+        return jsonify({"status": "error", "message": "Account created successfully"}), 200
 
     except Exception as e:
-        return f"Registration failed: {str(e)}", 500
+        return jsonify({"status": "error", "message": f"Registration failed: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
